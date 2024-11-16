@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:bubbles_in_flutter/models/contact.dart';
 import 'package:bubbles_in_flutter/models/message.dart';
+import 'package:bubbles_in_flutter/services/bubbles_service.dart';
+import 'package:conversation_bubbles/conversation_bubbles.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -11,6 +13,9 @@ class ChatsService {
   static final instance = ChatsService._();
 
   ChatsService._();
+
+  Contact? _launchContact;
+  Contact? get launchContact => _launchContact;
 
   Message _reply({required Contact contact, required String text}) {
     final Contact(:id, :name) = contact;
@@ -66,6 +71,17 @@ class ChatsService {
           )
         : Isar.getInstance()!;
 
+    final intentUri = await ConversationBubbles().getIntentUri();
+    if (intentUri != null) {
+      final uri = Uri.tryParse(intentUri);
+      if (uri != null) {
+        final id = int.tryParse(uri.pathSegments.last);
+        if (id != null) {
+          _launchContact = await ChatsService.instance.getContact(id);
+        }
+      }
+    }
+
     if (await _db.contacts.count() == 0) await _setupContacts();
   }
 
@@ -82,6 +98,7 @@ class ChatsService {
     Timer(const Duration(seconds: 5), () async {
       final reply = _reply(contact: contact, text: text);
       await _db.writeTxn(() async => await _db.messages.put(reply));
+      await BubblesService.instance.show(contact, reply.text);
     });
   }
 }
